@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -16,6 +17,11 @@ public class FluidSimulation : MonoBehaviour
     public Vector2 boundsSize = new(16f, 10f);
     public Vector2 containerCenter = Vector2.zero;
 
+    [Header("Grid Settings")]
+    public bool drawGrid;
+    [Range(1, 25)] public int subgridLength = 6;
+    [Range(0.01f, 5f)] public float cellSize = 1f;
+
     // Particles
     private Vector2[] _positions;
     private Vector4[] _colors;
@@ -26,6 +32,10 @@ public class FluidSimulation : MonoBehaviour
     private Matrix4x4[] _particleMatrices;
     private MaterialPropertyBlock _block;
 
+    // Grid
+
+    private Hashtable _grid;
+
     // Utils
     private bool _enableGizmos;
 
@@ -34,8 +44,8 @@ public class FluidSimulation : MonoBehaviour
     private void Start()
     {
         InitializeParticles();
+        InitializeGrid();
         _enableGizmos = true;
-
     }
 
     private void Update()
@@ -48,9 +58,21 @@ public class FluidSimulation : MonoBehaviour
         Graphics.DrawMeshInstanced(_particleMesh, 0, material, _particleMatrices, numParticles, _block);
     }
 
+    private void OnDrawGizmos()
+    {
+        if (_grid is not null && drawGrid)
+        {
+            foreach (DictionaryEntry entry in _grid)
+            {
+                var origin = (Vector2)entry.Key * subgridLength;
+                DrawSubGrid(origin);
+            }
+        }
+    }
+
     #endregion
 
-
+    #region Particles
     private void InitializeParticles()
     {
         _particleMesh = PolyMesh(particleRadius, particleSizes);
@@ -74,28 +96,6 @@ public class FluidSimulation : MonoBehaviour
             _colors[i] = Color.Lerp(Color.red, Color.blue, Random.value);
         }
     }
-
-    private void DrawContainer()
-    {
-        Vector2 halfBoundsSize = boundsSize * 0.5f;
-        Vector2[] corners = new Vector2[4]
-        {
-            new Vector2(containerCenter.x - halfBoundsSize.x, containerCenter.y + halfBoundsSize.y),
-            new Vector2(containerCenter.x + halfBoundsSize.x, containerCenter.y + halfBoundsSize.y),
-            new Vector2(containerCenter.x - halfBoundsSize.x, containerCenter.y - halfBoundsSize.y),
-            new Vector2(containerCenter.x + halfBoundsSize.x, containerCenter.y - halfBoundsSize.y)
-        };
-
-        // Draw top and bottom lines
-        Debug.DrawLine(corners[0], corners[1], Color.green, 0f, true);
-        Debug.DrawLine(corners[2], corners[3], Color.green, 0f, true);
-
-        // Draw left and right lines
-        Debug.DrawLine(corners[0], corners[2], Color.green, 0f, true);
-        Debug.DrawLine(corners[1], corners[3], Color.green, 0f, true);
-    }
-
-    // Mesh
 
     public Mesh PolyMesh(float radius, int n)
     {
@@ -146,4 +146,96 @@ public class FluidSimulation : MonoBehaviour
 
         return mesh;
     }
+
+    #endregion
+
+    #region Grid
+
+    private void InitializeGrid()
+    {
+        _grid = new Hashtable();
+        var numHori = Mathf.Max(Mathf.Ceil(boundsSize.x / subgridLength), 1);
+        var numVert = Mathf.Max(Mathf.Ceil(boundsSize.y / subgridLength), 1);
+
+        for (int i = 0; i < numHori; i++)
+        {
+            for (int j = 0; j < numVert; j++)
+            {
+                AddToGrid(CreateSubgrid(), i, j);
+                AddToGrid(CreateSubgrid(), -i, j);
+                AddToGrid(CreateSubgrid(), i, -j);
+                AddToGrid(CreateSubgrid(), -i, -j);
+            }
+        }
+    }
+
+    private struct GridCell
+    {
+        Vector2 position;
+    }
+
+    private GridCell[] CreateSubgrid()
+    {
+        return new GridCell[subgridLength];
+    }
+
+    private GridCell GetGridCell(GridCell[] subgrid, int i, int j)
+    {
+        return subgrid[(i * subgridLength) + j];
+    }
+
+    private void AddToGrid(GridCell[] subgrid, int x, int y)
+    {
+        var key = new Vector2(x, y);
+
+        if (_grid.ContainsKey(key)) return;
+
+        _grid.Add(key, subgrid);
+    }
+
+    #endregion
+
+    #region Debug
+    private void DrawContainer()
+    {
+        Vector2 halfBoundsSize = boundsSize * 0.5f;
+        Vector2[] corners = new Vector2[4]
+        {
+            new Vector2(containerCenter.x - halfBoundsSize.x, containerCenter.y + halfBoundsSize.y),
+            new Vector2(containerCenter.x + halfBoundsSize.x, containerCenter.y + halfBoundsSize.y),
+            new Vector2(containerCenter.x - halfBoundsSize.x, containerCenter.y - halfBoundsSize.y),
+            new Vector2(containerCenter.x + halfBoundsSize.x, containerCenter.y - halfBoundsSize.y)
+        };
+
+        // Draw top and bottom lines
+        Debug.DrawLine(corners[0], corners[1], Color.green, 0f, true);
+        Debug.DrawLine(corners[2], corners[3], Color.green, 0f, true);
+
+        // Draw left and right lines
+        Debug.DrawLine(corners[0], corners[2], Color.green, 0f, true);
+        Debug.DrawLine(corners[1], corners[3], Color.green, 0f, true);
+    }
+
+    void DrawSubGrid(Vector2 origin)
+    {
+        Vector2 offset = new Vector2(subgridLength * cellSize / 2, subgridLength * cellSize / 2);
+
+        // Draw vertical lines
+        for (int x = 0; x <= subgridLength; x++)
+        {
+            Vector2 start = origin + new Vector2(x * cellSize, 0) - offset;
+            Vector2 end = start + new Vector2(0, subgridLength * cellSize);
+            Debug.DrawLine(start, end, Color.green);
+        }
+
+        // Draw horizontal lines
+        for (int y = 0; y <= subgridLength; y++)
+        {
+            Vector2 start = origin + new Vector2(0, y * cellSize) - offset;
+            Vector2 end = start + new Vector2(subgridLength * cellSize, 0);
+            Debug.DrawLine(start, end, Color.green);
+        }
+    }
+
+    #endregion
 }
