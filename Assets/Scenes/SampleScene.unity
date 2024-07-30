@@ -249,6 +249,9 @@ MonoBehaviour:
   material: {fileID: 2100000, guid: 8f76d40732d54d5c59e7827d77793b6e, type: 2}
   boundsSize: {x: 10, y: 5}
   containerCenter: {x: 0, y: 0}
+  drawGrid: 1
+  subgridLength: 6
+  cellSize: 1
 --- !u!4 &664768319
 Transform:
   m_ObjectHideFlags: 0
