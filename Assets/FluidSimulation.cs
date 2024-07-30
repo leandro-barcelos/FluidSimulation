@@ -32,11 +32,7 @@ public class FluidSimulation : MonoBehaviour
     private MaterialPropertyBlock _block;
 
     // Grid
-
     private Hashtable _grid;
-
-    // Utils
-    private bool _enableGizmos;
 
     #region Event Functions
 
@@ -44,7 +40,6 @@ public class FluidSimulation : MonoBehaviour
     {
         InitializeParticles();
         InitializeGrid();
-        _enableGizmos = true;
     }
 
     private void Update()
@@ -169,7 +164,12 @@ public class FluidSimulation : MonoBehaviour
         }
     }
 
-    private struct Cell { }
+    private struct Cell
+    {
+        public float pressure;
+        public float u;
+        public float v;
+    }
 
     private struct Coord
     {
