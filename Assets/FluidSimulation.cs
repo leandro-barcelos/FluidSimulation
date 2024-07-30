@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -64,7 +63,8 @@ public class FluidSimulation : MonoBehaviour
         {
             foreach (DictionaryEntry entry in _grid)
             {
-                var origin = (Vector2)entry.Key * subgridLength;
+                var key = (Coord)entry.Key;
+                var origin = new Vector2(key.i, key.j) * subgridLength;
                 DrawSubGrid(origin);
             }
         }
@@ -161,36 +161,68 @@ public class FluidSimulation : MonoBehaviour
         {
             for (int j = 0; j < numVert; j++)
             {
-                AddToGrid(CreateSubgrid(), i, j);
-                AddToGrid(CreateSubgrid(), -i, j);
-                AddToGrid(CreateSubgrid(), i, -j);
-                AddToGrid(CreateSubgrid(), -i, -j);
+                AddToGrid(CreateSubgrid(), new Coord(i, j));
+                AddToGrid(CreateSubgrid(), new Coord(-i, j));
+                AddToGrid(CreateSubgrid(), new Coord(i, -j));
+                AddToGrid(CreateSubgrid(), new Coord(-i, -j));
             }
         }
     }
 
-    private struct GridCell
+    private struct Cell { }
+
+    private struct Coord
     {
-        Vector2 position;
+        public int i;
+        public int j;
+
+        public Coord(int i, int j)
+        {
+            this.i = i;
+            this.j = j;
+        }
     }
 
-    private GridCell[] CreateSubgrid()
+    private Cell[] CreateSubgrid()
     {
-        return new GridCell[subgridLength];
+        return new Cell[subgridLength];
     }
 
-    private GridCell GetGridCell(GridCell[] subgrid, int i, int j)
+    private Cell GetCell(Cell[] subGrid, Coord cellCoord)
     {
-        return subgrid[(i * subgridLength) + j];
+        return subGrid[(cellCoord.i * subgridLength) + cellCoord.j];
     }
 
-    private void AddToGrid(GridCell[] subgrid, int x, int y)
+    private void AddToGrid(Cell[] subGrid, Coord subGridCoord)
     {
-        var key = new Vector2(x, y);
+        if (_grid.ContainsKey(subGridCoord)) return;
+        _grid.Add(subGridCoord, subGrid);
+    }
 
-        if (_grid.ContainsKey(key)) return;
+    private (Coord, Coord) WorldToGrid(Vector2 worldPosition)
+    {
+        var halfSubgrid = subgridLength * cellSize / 2;
+        var relativeGridPosition = worldPosition + new Vector2(halfSubgrid, halfSubgrid);
 
-        _grid.Add(key, subgrid);
+        var subgridPos = new Coord(
+            Mathf.FloorToInt(relativeGridPosition.x / cellSize),
+            Mathf.FloorToInt(relativeGridPosition.y / cellSize)
+        );
+
+        var gridPos = new Coord(
+            Mathf.FloorToInt(relativeGridPosition.x / subgridLength),
+            Mathf.FloorToInt(relativeGridPosition.y / subgridLength)
+        );
+
+        subgridPos.i = (subgridPos.i < 0)
+            ? subgridPos.i + Mathf.Abs(gridPos.i) * subgridLength
+            : subgridPos.i % subgridLength;
+
+        subgridPos.j = (subgridPos.j < 0)
+            ? subgridPos.j + Mathf.Abs(gridPos.j) * subgridLength
+            : subgridPos.j % subgridLength;
+
+        return (gridPos, subgridPos);
     }
 
     #endregion
